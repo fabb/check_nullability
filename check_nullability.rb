@@ -30,17 +30,25 @@ all_headers = find_all_headers(options.include_paths, options.exclude_paths)
 
 if all_headers.count == 0 then bail_out('no headers found in search folders', options.warn_only) end
 
-recursive_imports = recursive_imports_in_file(options.header_file, all_headers)
+not_containing_nullability = []
 
-if options.verbose
-	not_found_imports = recursive_imports.select {|f| make_header_absolute_filename(f, all_headers) == nil}
-	not_found_imports.each {|i|
-		puts "import not found/excluded: " + i
-	}
+if options.start_header
+	# check only headers that are imported by start_header recursively
+	recursive_imports = recursive_imports_in_file(options.start_header, all_headers)
+
+	if options.verbose
+		not_found_imports = recursive_imports.select {|f| make_header_absolute_filename(f, all_headers) == nil}
+		not_found_imports.each {|i|
+			puts "import not found/excluded: " + i
+		}
+	end
+
+	found_imports_absolute = recursive_imports.map {|f| make_header_absolute_filename(f, all_headers)}.compact
+	not_containing_nullability = found_imports_absolute.select {|f| not contains_any_nullability?(f)}
+else
+	# check all headers in include_paths
+	not_containing_nullability = all_headers.select {|f| not contains_any_nullability?(f)}
 end
-
-found_imports_absolute = recursive_imports.map {|f| make_header_absolute_filename(f, all_headers)}.compact
-not_containing_nullability = found_imports_absolute.select {|f| not contains_any_nullability?(f)}
 
 if not_containing_nullability.empty?
 	exit 0
@@ -55,20 +63,23 @@ end
 BEGIN {
 	def parse(args)
 		options = OpenStruct.new
-		options.header_file = nil
+		options.start_header = nil
 		options.include_paths = [Pathname(".")]
 		options.exclude_paths = []
 		options.warn_only = false
 		options.verbose = false
 
 		opt_parser = OptionParser.new do |opts|
-			opts.banner = "Usage: " + File.basename(__FILE__) + " [options] header_file.h"
-
-			opts.separator ""
-			opts.separator "header_file.h is the starting point for the search of nullability annotations, from there all #import statements will be followed recursively"
+			opts.banner = "Usage: " + File.basename(__FILE__) + " [options]"
 
 			opts.separator ""
 			opts.separator "Specific options:"
+
+			opts.on("-s", "--start-header HEADER_FILENAME",
+							"HEADER_FILENAME is the starting point for the search of nullability annotations, from there all #import statements will be followed recursively",
+							"If this option is not given, then ALL headers in include-paths are searched") do |start_header|
+				options.start_header = start_header
+			end
 
 			opts.on("-i x,y,z", "--include-paths PATH1,PATH2,PATH3", Array,
 							"Comma-separated list of paths to search for headers found in include statements", "If not given, uses the current working directory as include path") do |include_paths|
@@ -99,18 +110,18 @@ BEGIN {
 
 		begin
 			opt_parser.parse!
-			unless ARGV.length == 1
-				raise OptionParser::MissingArgument.new("missing header_file.h")
+			unless ARGV.length == 0
+				raise OptionParser::NeedlessArgument.new("too many arguments")
 			end
 
-			options.header_file = ARGV.pop
-
-			options.header_file = Pathname(options.header_file)
-			unless options.header_file.file?
-				raise OptionParser::InvalidArgument.new("header_file.h not found at given location")
-			end
-			unless options.header_file.extname == ".h"
-				raise OptionParser::InvalidArgument.new("header_file.h needs to have extension .h, given: " + options.header_file.extname)
+			if options.start_header
+				options.start_header = Pathname(options.start_header)
+				unless options.start_header.file?
+					raise OptionParser::InvalidArgument.new("start_header not found at given location")
+				end
+				unless options.start_header.extname == ".h"
+					raise OptionParser::InvalidArgument.new("start_header.h needs to have extension .h, given: " + options.start_header.extname)
+				end
 			end
 
 			options.include_paths.each {|p| 
