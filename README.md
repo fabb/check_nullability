@@ -8,6 +8,8 @@ With this script, all headers that do not contain any nullability annotations ca
 
 Usually one does not want to check all headers, but only the ones imported via the `bridging header`, so this script provides an option to support this.
 
+For a more detailed problem and solution description, I wrote [this blog post](http://tech.willhaben.at/2016/12/avoiding-implicit.html).
+
 # Dependencies
 
 The script depends on `ruby 2.0.0` or higher and does not have any external dependencies. This ruby version is installed by default on OSX El Capitan or macOS Sierra.
