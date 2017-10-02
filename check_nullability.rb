@@ -180,7 +180,7 @@ BEGIN {
 
 	# all_header_pathnames expected to only contain realpaths
 	def make_header_absolute_filename(filename, all_header_pathnames)
-		all_header_pathnames.find {|p| p.to_path.end_with?(filename)}
+		all_header_pathnames.find {|p| p.to_path.end_with?("/" + filename)}
 	end
 
 	def contains_any_nullability?(file_pathname)
